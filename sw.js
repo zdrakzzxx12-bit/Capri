@@ -1,6 +1,6 @@
 /* Service worker de Capri: guarda la app para abrirla sin conexión.
    Solo cachea archivos de este mismo origen; las llamadas a la API nunca pasan por la caché. */
-const CACHE = 'capri-v4';
+const CACHE = 'capri-v5';
 const ASSETS = ['./', 'index.html', 'i18n.js', 'i18n-pwa.js', 'personality.md', 'manifest.webmanifest',
   'icon-192.png', 'icon-512.png', 'apple-touch-icon.png'];
 

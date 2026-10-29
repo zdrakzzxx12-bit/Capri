@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://api.open-meteo.com https://geocoding-api.open-meteo.com; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https://api.anthropic.com https://text.pollinations.ai https://api.open-meteo.com https://geocoding-api.open-meteo.com; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="theme-color" content="#07040f">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
@@ -173,7 +173,7 @@ const ls = {
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } },
   del(k) { try { localStorage.removeItem(k); } catch {} }
 };
-const S = Object.assign({ key: '', model: 'claude-sonnet-5-5', city: '', lang: null, sound: false, theme: 'cyan', web: true }, ls.get('capri_settings', {}));
+const S = Object.assign({ key: '', model: 'claude-sonnet-5-5', city: '', lang: null, sound: false, theme: 'cyan', web: true, free: true }, ls.get('capri_settings', {}));
 let memory = ls.get('capri_memory', { facts: [] });
 let tasks = ls.get('capri_tasks', []);
 let chatLog = ls.get('capri_log', []);
@@ -201,8 +201,8 @@ function setTheme(name) {
 }
 
 function refreshBrain() {
-  el.brain.textContent = S.key ? T('brainAI', { m: S.model.replace('claude-', '') }) : T('brainNone');
-  el.brain.classList.toggle('on', !!S.key);
+  el.brain.textContent = S.key ? T('brainAI', { m: S.model.replace('claude-', '') }) : S.free ? T('brainFree') : T('brainNone');
+  el.brain.classList.toggle('on', !!S.key || !!S.free);
 }
 function setStatus(t) { el.brain.textContent = '> ' + t; el.brain.style.color = 'var(--yellow)'; }
 function clearStatus() { el.brain.style.color = ''; refreshBrain(); }
@@ -653,6 +653,34 @@ async function ask(content, hooks) {
   } finally { clearStatus(); }
 }
 
+/* ===================== IA GRATIS (sin clave) =====================
+   Servicio público y gratuito (Pollinations). Sin clave, pero los mensajes pasan por un tercero:
+   por eso NO se envía memoria, tareas ni ciudad, y se avisa al usuario la primera vez. */
+const FREE_URL = 'https://text.pollinations.ai/openai';
+let freeHist = [];
+async function freeAsk(text) {
+  const sys = `${personality}
+
+# Contexto
+Fecha y hora: ${new Date().toLocaleString(locale(), { dateStyle: 'full', timeStyle: 'short' })}
+Modo gratuito: no tienes memoria, herramientas ni búsqueda web en este modo. Responde siempre en el idioma en que te escriba el usuario. Usa Markdown con moderación. Si no sabes algo de actualidad, dilo.`;
+  const msgs = [{ role: 'system', content: sys }].concat(freeHist.slice(-10), [{ role: 'user', content: text }]);
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 45000);
+  try {
+    const r = await fetch(FREE_URL, {
+      method: 'POST', signal: ctl.signal, headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ model: 'openai', messages: msgs, stream: false })
+    });
+    if (!r.ok) { const e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
+    const j = await r.json();
+    const out = ((j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '').trim();
+    if (!out) throw new Error('empty');
+    freeHist.push({ role: 'user', content: text }, { role: 'assistant', content: out });
+    freeHist = freeHist.slice(-20);
+    return out;
+  } finally { clearTimeout(timer); }
+}
+
 /* ===================== COMANDOS ===================== */
 const ALIAS = {
   '/key': 'key', '/clave': 'key', '/city': 'city', '/ciudad': 'city', '/model': 'model', '/modelo': 'model',
@@ -660,7 +688,7 @@ const ALIAS = {
   '/task': 'task', '/tarea': 'task', '/tasks': 'tasks', '/tareas': 'tasks', '/done': 'done', '/hecho': 'done',
   '/theme': 'theme', '/tema': 'theme', '/memory': 'memory', '/memoria': 'memory', '/new': 'new', '/nueva': 'new',
   '/forgetall': 'forgetall', '/olvidatodo': 'forgetall',
-  '/web': 'web', '/buscar': 'web', '/help': 'help', '/ayuda': 'help', '/hilfe': 'help', '/aide': 'help', '/ajuda': 'help'
+  '/web': 'web', '/free': 'free', '/gratis': 'free', '/buscar': 'web', '/help': 'help', '/ayuda': 'help', '/hilfe': 'help', '/aide': 'help', '/ajuda': 'help'
 };
 async function command(text) {
   const parts = text.trim().split(/\s+/);
@@ -703,6 +731,9 @@ async function command(text) {
     case 'forgetall':
       memory.facts = []; saveMem(); history = []; chatLog = []; saveLog(); el.log.textContent = '';
       return T('forgot');
+    case 'free':
+      if (/^(off|no|0)$/i.test(arg)) S.free = false; else if (/^(on|si|sí|1)$/i.test(arg) || !arg) S.free = true; else return T('freeUsage');
+      saveS(); refreshBrain(); return S.free ? T('freeOn') : T('freeOff');
     case 'help': return T('helpPwa');
     default: return T('unknown');
   }
@@ -767,7 +798,17 @@ el.form.addEventListener('submit', async e => {
     } else if (!S.key) {
       addMsg((att ? '📎 ' + att.name + (text ? '\n' : '') : '') + text, 'me');
       setPending(null);
-      await botSay(att ? T('noBrain') : basicBrain(text));
+      if (att) await botSay(T('noBrain'));
+      else if (S.free) {
+        const tryBasic = basicBrain(text);
+        if (tryBasic !== T('basicOnly') && /^[\d\s+\-*/().,%^]+$/.test(text.trim())) await botSay(tryBasic);
+        else {
+          if (!ls.get('capri_free_ok', false)) { ls.set('capri_free_ok', true); addMsg(T('freeNote'), 'bot', false); }
+          setState('thinking'); const holder = dotsMsg();
+          try { const out = await freeAsk(text); finishAI(holder, out, true); }
+          catch (e) { finishAI(holder, T('freeFail') + '\n\n' + basicBrain(text), false); }
+        }
+      } else await botSay(basicBrain(text));
     } else {
       addMsg((att ? '📎 ' + att.name + (text ? '\n' : '') : '') + text, 'me', true, true);
       const entry = chatLog[chatLog.length - 1];
@@ -850,7 +891,7 @@ chatLog.forEach(m => {
   if (m.ai && m.who === 'bot') { d.classList.add('md'); renderMarkdown(d, m.text); }
 });
 rebuildHistory();
-if (!chatLog.length) addMsg(S.key ? T('welcomeKey') : T('welcomeNoKey'), 'bot');
+if (!chatLog.length) addMsg(S.key ? T('welcomeKey') : S.free ? T('welcomeFree') : T('welcomeNoKey'), 'bot');
 
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
   navigator.serviceWorker.register('sw.js').catch(() => {});

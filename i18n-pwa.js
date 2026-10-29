@@ -141,3 +141,22 @@
   };
   for (const l of Object.keys(Y)) window.CapriI18n.extend(l, Y[l]);
 })();
+
+/* Textos del modo gratis (sin clave) */
+(function () {
+  const Z = {
+    en: { brainFree: 'FREE AI', welcomeFree: "I'm CAPRI. I'm running in free mode: ask me anything. For my best brain, add /key with an Anthropic API key.",
+      freeNote: "Heads up: in free mode your messages go through a free public AI service (a third party), not Claude. Don't write passwords or private data. I don't use memory or web search here. /free off turns it off.",
+      freeFail: "The free AI isn't answering right now (the service may be busy or down). I can only do the basics for now.",
+      freeOn: 'Free mode on.', freeOff: 'Free mode off.', freeUsage: 'Usage: /free on | off' },
+    es: { brainFree: 'IA GRATIS', welcomeFree: 'Soy CAPRI. Estoy en modo gratis: pregúntame lo que quieras. Para mi mejor cerebro, añade /clave con una clave de API de Anthropic.',
+      freeNote: 'Ojo: en modo gratis tus mensajes pasan por un servicio público de IA gratuito (un tercero), no por Claude. No escribas contraseñas ni datos privados. Aquí no uso memoria ni búsqueda web. /gratis off lo desactiva.',
+      freeFail: 'La IA gratuita no responde ahora mismo (el servicio puede estar saturado o caído). Por ahora solo puedo hacer lo básico.',
+      freeOn: 'Modo gratis activado.', freeOff: 'Modo gratis desactivado.', freeUsage: 'Uso: /gratis on | off' },
+    de: { brainFree: 'GRATIS-KI', welcomeFree: 'Ich bin CAPRI. Ich laufe im Gratis-Modus: Frag mich, was du willst. Für mein bestes Gehirn füge /key mit einem Anthropic-API-Schlüssel hinzu.',
+      freeNote: 'Achtung: Im Gratis-Modus laufen deine Nachrichten über einen kostenlosen öffentlichen KI-Dienst (Dritter), nicht über Claude. Schreib keine Passwörter oder privaten Daten. Hier nutze ich weder Gedächtnis noch Websuche. /free off schaltet es aus.',
+      freeFail: 'Die Gratis-KI antwortet gerade nicht (der Dienst ist evtl. überlastet oder down). Ich kann vorerst nur die Grundlagen.',
+      freeOn: 'Gratis-Modus an.', freeOff: 'Gratis-Modus aus.', freeUsage: 'Nutzung: /free on | off' }
+  };
+  for (const l of Object.keys(Z)) window.CapriI18n.extend(l, Z[l]);
+})();
